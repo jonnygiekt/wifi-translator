@@ -9,11 +9,12 @@ requirements = python3,kivy,pyjnius
 orientation = portrait
 fullscreen = 0
 
-# Android 12+ (API 31+) support. Buildozer uses these to build the APK.
-android.minapi = 31
-android.api = 35
-android.ndk = 27b
-android.permissions = INTERNET,ACCESS_FINE_LOCATION,ACCESS_COARSE_LOCATION,NEARBY_WIFI_DEVICES
+# Android settings
+android.minapi = 26
+android.api = 33
+android.ndk = 25b
+android.archs = arm64-v8a
+android.permissions = INTERNET,ACCESS_FINE_LOCATION,ACCESS_COARSE_LOCATION,ACCESS_WIFI_STATE,CHANGE_WIFI_STATE
 android.accept_sdk_license = True
 
 [buildozer]
