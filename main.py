@@ -37,14 +37,14 @@ BoxLayout:
         height: "54dp"
 
     Label:
-        text: "اكتشف الشبكات واختر شبكتك"
+        text: "Discover networks and select yours"
         font_size: "16sp"
         color: (0.85, 0.89, 0.94, 1)
         size_hint_y: None
         height: "32dp"
 
     Button:
-        text: "فحص شبكات Wi-Fi"
+        text: "Scan Wi-Fi Networks"
         size_hint_y: None
         height: "48dp"
         background_normal: ""
@@ -68,21 +68,21 @@ BoxLayout:
             height: self.minimum_height
 
     Label:
-        text: "اسم الشبكة المختارة"
+        text: "Selected Network"
         size_hint_y: None
         height: "26dp"
         color: (0.8, 0.85, 0.92, 1)
 
     Label:
         id: selected_ssid
-        text: app.selected_ssid if app.selected_ssid else "لم يتم اختيار شبكة"
+        text: app.selected_ssid if app.selected_ssid else "No network selected"
         size_hint_y: None
         height: "35dp"
         color: (1, 1, 1, 1)
         bold: True
 
     Button:
-        text: "احسب كلمة المرور المتوقعة"
+        text: "Calculate Expected Password"
         size_hint_y: None
         height: "48dp"
         background_normal: ""
@@ -90,7 +90,7 @@ BoxLayout:
         on_release: app.translate_selected()
 
     Label:
-        text: "النتيجة حسب قواعد التحويل"
+        text: "Result according to translation rules"
         size_hint_y: None
         height: "25dp"
         color: (0.8, 0.85, 0.92, 1)
@@ -105,7 +105,7 @@ BoxLayout:
         color: (0.30, 0.90, 0.55, 1)
 
     Button:
-        text: "نسخ النتيجة"
+        text: "Copy Result"
         size_hint_y: None
         height: "44dp"
         background_normal: ""
@@ -113,7 +113,7 @@ BoxLayout:
         on_release: app.copy_result()
 
     Button:
-        text: "فتح إعدادات Wi-Fi"
+        text: "Open Wi-Fi Settings"
         size_hint_y: None
         height: "44dp"
         background_normal: ""
@@ -121,7 +121,7 @@ BoxLayout:
         on_release: app.open_wifi_settings()
 
     Label:
-        text: "ملاحظة: النتيجة تخمين وفق قواعدك وليست استخراجاً لكلمة السر."
+        text: "Note: The result is a rule-based guess, not an actual password retrieval."
         size_hint_y: None
         height: "38dp"
         font_size: "11sp"
@@ -133,7 +133,7 @@ class NetworkButton(Button):
 
 
 class WifiTranslatorApp(App):
-    status = StringProperty("امنح أذونات Wi-Fi والموقع عند الطلب ثم ابدأ الفحص.")
+    status = StringProperty("Grant Wi-Fi and Location permissions when prompted, then tap Scan.")
     selected_ssid = StringProperty("")
     result = StringProperty("—")
     networks = ListProperty([])
@@ -150,22 +150,20 @@ class WifiTranslatorApp(App):
         try:
             from android.permissions import request_permissions, Permission
             perms = [Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION]
-            # NEARBY_WIFI_DEVICES exists on Android 13+; request by string to
-            # remain compatible with older Android releases.
             perms.append("android.permission.NEARBY_WIFI_DEVICES")
             request_permissions(perms, self.permission_callback)
         except Exception as exc:
-            self.status = f"تعذر طلب الأذونات: {exc}"
+            self.status = f"Failed to request permissions: {exc}"
 
     def permission_callback(self, permissions, grants):
         if grants and all(grants):
-            self.status = "الأذونات مقبولة. اضغط فحص شبكات Wi-Fi."
+            self.status = "Permissions granted. Tap 'Scan Wi-Fi Networks'."
         else:
-            self.status = "يلزم السماح بإذن الموقع/الأجهزة القريبة لفحص الشبكات."
+            self.status = "Location / Nearby devices permission is required to scan networks."
 
     def scan_networks(self):
         if platform != "android":
-            self.status = "فحص الشبكات متاح داخل تطبيق Android المثبت."
+            self.status = "Scanning is only available inside the installed Android app."
             return
         try:
             from jnius import autoclass
@@ -174,13 +172,11 @@ class WifiTranslatorApp(App):
             activity = PythonActivity.mActivity
             wifi = activity.getApplicationContext().getSystemService(Context.WIFI_SERVICE)
 
-            # Android may throttle scans. A scan request can fail or return
-            # cached results; this app never attempts to bypass those limits.
             started = wifi.startScan()
-            self.status = "جارٍ فحص الشبكات..." if started else "تعذر بدء فحص جديد؛ سنحاول قراءة النتائج المتاحة."
+            self.status = "Scanning networks..." if started else "Cannot start new scan; attempting to read cached results."
             Clock.schedule_once(lambda dt: self.read_scan_results(wifi), 3.0)
         except Exception as exc:
-            self.status = f"خطأ أثناء الفحص: {exc}"
+            self.status = f"Error during scan: {exc}"
 
     def read_scan_results(self, wifi):
         try:
@@ -194,26 +190,25 @@ class WifiTranslatorApp(App):
             container = self.root.ids.network_list
             container.clear_widgets()
             if not found:
-                self.status = ("لم تظهر شبكات. تأكد من تشغيل Wi-Fi وخدمات الموقع "
-                               "ومنح الأذونات، ثم أعد المحاولة.")
+                self.status = ("No networks found. Ensure Wi-Fi & Location services are ON "
+                               "and permissions are granted, then try again.")
                 return
             for ssid in found:
                 btn = NetworkButton(text=ssid)
                 btn.bind(on_release=lambda _btn, name=ssid: self.select_network(name))
                 container.add_widget(btn)
-            self.status = f"تم العثور على {len(found)} شبكة (قد تكون النتائج مخزنة مؤقتاً)."
+            self.status = f"Found {len(found)} network(s) (results may be cached)."
         except Exception as exc:
-            self.status = f"تعذر قراءة نتائج الفحص: {exc}"
+            self.status = f"Failed to read scan results: {exc}"
 
     def select_network(self, ssid):
         self.selected_ssid = ssid
         self.result = "—"
-        self.status = f"تم اختيار: {ssid}"
+        self.status = f"Selected: {ssid}"
 
     @staticmethod
     def convert_name(ssid):
         value = ssid.lower()
-        # Apply the longer token first so fh_ is replaced before f -> 0.
         value = value.replace("fh_", "wlan")
         for old, new in (("a", "5"), ("d", "2"), ("b", "4"),
                          ("f", "0"), ("8", "7"), ("9", "6")):
@@ -222,25 +217,25 @@ class WifiTranslatorApp(App):
 
     def translate_selected(self):
         if not self.selected_ssid:
-            self.status = "اختر شبكة من القائمة أولاً."
+            self.status = "Please select a network from the list first."
             return
         self.result = self.convert_name(self.selected_ssid)
-        self.status = "تم تطبيق قواعد التحويل."
+        self.status = "Translation rules applied."
 
     def copy_result(self):
         if not self.result or self.result == "—":
-            self.status = "احسب النتيجة أولاً."
+            self.status = "Calculate the result first."
             return
         try:
             from kivy.core.clipboard import Clipboard
             Clipboard.copy(self.result)
-            self.status = "تم نسخ النتيجة."
+            self.status = "Result copied to clipboard."
         except Exception as exc:
-            self.status = f"تعذر النسخ: {exc}"
+            self.status = f"Failed to copy: {exc}"
 
     def open_wifi_settings(self):
         if platform != "android":
-            self.status = "هذا الخيار يعمل على Android فقط."
+            self.status = "This option only works on Android."
             return
         try:
             from jnius import autoclass
@@ -251,7 +246,7 @@ class WifiTranslatorApp(App):
             intent = Intent(Settings.ACTION_WIFI_SETTINGS)
             activity.startActivity(intent)
         except Exception as exc:
-            self.status = f"تعذر فتح إعدادات Wi-Fi: {exc}"
+            self.status = f"Failed to open Wi-Fi settings: {exc}"
 
 
 if __name__ == "__main__":
